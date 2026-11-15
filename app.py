@@ -34,7 +34,6 @@ ALTURA_REFERENCIA = 0.20
 ALTURAS_DISPONIVEIS = [18, 20, 22, 24, 26, 28, 30, 32]
 ALTURA_DEFAULT = 22
 
-# Mapeamento Set/Phase -> campo de altura no cadastro
 MAPEAMENTO_SET_PHASE = {
     (1, 1): 'dist_f1',
     (1, 2): 'dist_f2',
@@ -43,10 +42,9 @@ MAPEAMENTO_SET_PHASE = {
     (2, 2): 'dist_f5',
     (2, 3): 'dist_f6',
     (4, 1): 'dist_pr',
-    (5, 1): 'dist_pr2',   # reservado para futuro (não existe no Excel hoje)
+    (5, 1): 'dist_pr2',
 }
 
-# Sets requeridos por configuração de estrutura
 SETS_REQUERIDOS = {
     'CS_sem_PR': {1},
     'CS_com_PR': {1, 4},
@@ -54,7 +52,6 @@ SETS_REQUERIDOS = {
     'CD_com_PR': {1, 2, 4},
 }
 
-# Lista de LCs disponíveis (dependência de set)
 LCS_DISPONIVEIS = [
     {'nome': 'EDS',              'sets': set()},
     {'nome': 'TEMP MÍM',         'sets': set()},
@@ -79,11 +76,18 @@ LCS_DISPONIVEIS = [
 ]
 
 # ============================================================
+# CAMINHO DO CADASTRO (relativo ao app.py, não ao diretório de execução)
+# ============================================================
+CAMINHO_ESTRUTURAS = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "estruturas.xlsx"
+)
+
+# ============================================================
 # CADASTRO DE ESTRUTURAS (mesma leitura do VHPT 1.0)
 # ============================================================
 @st.cache_data
 def carregar_estruturas():
-    if not os.path.exists("estruturas.xlsx"):
+    if not os.path.exists(CAMINHO_ESTRUTURAS):
         return []
 
     def _float_ou_padrao(valor, padrao):
@@ -98,7 +102,7 @@ def carregar_estruturas():
             return padrao
 
     try:
-        df = pd.read_excel("estruturas.xlsx", engine="openpyxl")
+        df = pd.read_excel(CAMINHO_ESTRUTURAS, engine="openpyxl")
         estruturas = []
         for _, row in df.iterrows():
             liberacao = str(row.iloc[1]).strip().upper() if pd.notna(row.iloc[1]) else ""
@@ -131,7 +135,7 @@ def carregar_estruturas():
                 "dist_f4":  _float_ou_padrao(row.iloc[16] if len(row) > 16 else None, 0.20),
                 "dist_f5":  _float_ou_padrao(row.iloc[17] if len(row) > 17 else None, 2.20),
                 "dist_f6":  _float_ou_padrao(row.iloc[18] if len(row) > 18 else None, 4.20),
-                "dist_pr2": None,  # Reservado para PR2 (futuro)
+                "dist_pr2": None,
             }
             if estrutura["nome"]:
                 estruturas.append(estrutura)
@@ -409,6 +413,7 @@ def plotar_diagrama(resultado, estrutura):
 def inicializar_estado():
     defaults = {
         "texto_colado": "",
+        "textarea_pendente": "",
         "estrutura_nome": "",
         "altura": ALTURA_DEFAULT,
         "fator_cagaco": 0,
@@ -431,6 +436,7 @@ def reset_geral():
 
 def limpar_tabela():
     st.session_state["texto_colado"] = ""
+    st.session_state["textarea_pendente"] = ""
     st.session_state["resultados"] = None
     st.session_state["lc_critico"] = None
     st.session_state["lc_grafico"] = None
@@ -444,7 +450,10 @@ estruturas = carregar_estruturas()
 st.subheader("🏗️ 1. Estrutura")
 
 if not estruturas:
-    st.error("Nenhuma estrutura carregada. Verifique o arquivo estruturas.xlsx.")
+    st.error(
+        "Nenhuma estrutura carregada. Verifique se o arquivo `estruturas.xlsx` "
+        "está na mesma pasta do `app.py`."
+    )
     st.stop()
 
 nomes = [e["nome"] for e in estruturas]
@@ -477,15 +486,29 @@ if estrutura is not None:
         "B_Vert | B_Trans | B_Long | A_Vert | A_Trans | A_Long | Warnings"
     )
 
-    texto_colado = st.text_area(
+    st.text_area(
         "Cole aqui (Ctrl+V do Excel):",
-        value=st.session_state["texto_colado"],
+        value=st.session_state["textarea_pendente"],
         height=200,
-        key="textarea_tabela"
+        key="textarea_pendente"
     )
-    if texto_colado != st.session_state["texto_colado"]:
-        st.session_state["texto_colado"] = texto_colado
-        st.session_state["resultados"] = None
+
+    cbtn_ap, cbtn_limpar_campo = st.columns([1, 1])
+    with cbtn_ap:
+        if st.button("📥 Aplicar tabela", use_container_width=True):
+            st.session_state["texto_colado"] = st.session_state.get("textarea_pendente", "")
+            st.session_state["resultados"] = None
+            st.session_state["lc_critico"] = None
+            st.session_state["lc_grafico"] = None
+            st.rerun()
+    with cbtn_limpar_campo:
+        if st.button("🗑️ Limpar campo", use_container_width=True):
+            st.session_state["textarea_pendente"] = ""
+            st.session_state["texto_colado"] = ""
+            st.session_state["resultados"] = None
+            st.session_state["lc_critico"] = None
+            st.session_state["lc_grafico"] = None
+            st.rerun()
 
     df = None
     sets_presentes = set()
