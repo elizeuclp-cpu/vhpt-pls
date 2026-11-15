@@ -76,14 +76,14 @@ LCS_DISPONIVEIS = [
 ]
 
 # ============================================================
-# CAMINHO DO CADASTRO (relativo ao app.py, não ao diretório de execução)
+# CAMINHO DO CADASTRO
 # ============================================================
 CAMINHO_ESTRUTURAS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "estruturas.xlsx"
 )
 
 # ============================================================
-# CADASTRO DE ESTRUTURAS (mesma leitura do VHPT 1.0)
+# CADASTRO DE ESTRUTURAS
 # ============================================================
 @st.cache_data
 def carregar_estruturas():
@@ -424,6 +424,7 @@ def inicializar_estado():
         "resultados": None,
         "lc_critico": None,
         "lc_grafico": None,
+        "_limpar_textarea_flag": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -435,8 +436,10 @@ def reset_geral():
     inicializar_estado()
 
 def limpar_tabela():
+    # Apenas seta o flag; o reset real acontece no topo do bloco de colagem,
+    # antes do widget ser renderizado (regra do Streamlit).
+    st.session_state["_limpar_textarea_flag"] = True
     st.session_state["texto_colado"] = ""
-    st.session_state["textarea_pendente"] = ""
     st.session_state["resultados"] = None
     st.session_state["lc_critico"] = None
     st.session_state["lc_grafico"] = None
@@ -486,9 +489,13 @@ if estrutura is not None:
         "B_Vert | B_Trans | B_Long | A_Vert | A_Trans | A_Long | Warnings"
     )
 
+    # Reset do text_area ANTES do widget ser renderizado (regra Streamlit)
+    if st.session_state.get("_limpar_textarea_flag", False):
+        st.session_state["textarea_pendente"] = ""
+        st.session_state["_limpar_textarea_flag"] = False
+
     st.text_area(
         "Cole aqui (Ctrl+V do Excel):",
-        value=st.session_state["textarea_pendente"],
         height=200,
         key="textarea_pendente"
     )
@@ -503,7 +510,7 @@ if estrutura is not None:
             st.rerun()
     with cbtn_limpar_campo:
         if st.button("🗑️ Limpar campo", use_container_width=True):
-            st.session_state["textarea_pendente"] = ""
+            st.session_state["_limpar_textarea_flag"] = True
             st.session_state["texto_colado"] = ""
             st.session_state["resultados"] = None
             st.session_state["lc_critico"] = None
