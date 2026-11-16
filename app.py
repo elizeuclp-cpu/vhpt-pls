@@ -35,12 +35,8 @@ ALTURAS_DISPONIVEIS = [18, 20, 22, 24, 26, 28, 30, 32]
 ALTURA_DEFAULT = 22
 
 MAPEAMENTO_SET_PHASE = {
-    (1, 1): 'dist_f1',
-    (1, 2): 'dist_f2',
-    (1, 3): 'dist_f3',
-    (2, 1): 'dist_f4',
-    (2, 2): 'dist_f5',
-    (2, 3): 'dist_f6',
+    (1, 1): 'dist_f1', (1, 2): 'dist_f2', (1, 3): 'dist_f3',
+    (2, 1): 'dist_f4', (2, 2): 'dist_f5', (2, 3): 'dist_f6',
     (4, 1): 'dist_pr',
     (5, 1): 'dist_pr2',
 }
@@ -50,6 +46,15 @@ SETS_REQUERIDOS = {
     'CS_com_PR': {1, 4},
     'CD_sem_PR': {1, 2},
     'CD_com_PR': {1, 2, 4},
+}
+
+CONFIG_OPCOES = ["CS_sem_PR", "CS_com_PR", "CD_sem_PR", "CD_com_PR"]
+
+CONFIG_LABELS = {
+    "CS_sem_PR": "CS sem PR",
+    "CS_com_PR": "CS com PR",
+    "CD_sem_PR": "CD sem PR",
+    "CD_com_PR": "CD com PR",
 }
 
 LCS_DISPONIVEIS = [
@@ -198,7 +203,11 @@ def parsear_tabela(texto):
     return df, None
 
 def detectar_sets(df):
-    return set(df["Set"].unique().tolist())
+    try:
+        vals = df["Set"].dropna().unique().tolist()
+        return set(int(v) for v in vals if v is not None)
+    except (ValueError, TypeError):
+        return set()
 
 def listar_lcs_disponiveis(sets_presentes):
     disponiveis = []
@@ -255,7 +264,10 @@ def processar_lc(nome_lc, df_lc, estrutura, altura, fator_cagaco_pct,
 
     resultados_por_cabo = {}
     for _, row in df_lc.iterrows():
-        chave = (int(row["Set"]), int(row["Phase"]))
+        try:
+            chave = (int(row["Set"]), int(row["Phase"]))
+        except (ValueError, TypeError):
+            continue
         campo_alt = MAPEAMENTO_SET_PHASE.get(chave)
         if campo_alt is None:
             continue
@@ -271,10 +283,7 @@ def processar_lc(nome_lc, df_lc, estrutura, altura, fator_cagaco_pct,
         V_cabo = float(row["B_Vert"])  + float(row["A_Vert"])
 
         resultados_por_cabo[chave] = {
-            "K": K,
-            "T": T_cabo,
-            "L": L_cabo,
-            "V": V_cabo,
+            "K": K, "T": T_cabo, "L": L_cabo, "V": V_cabo,
             "B_Trans": float(row["B_Trans"]),
             "A_Trans": float(row["A_Trans"]),
             "B_Long":  float(row["B_Long"]),
@@ -342,7 +351,6 @@ def processar_lc(nome_lc, df_lc, estrutura, altura, fator_cagaco_pct,
 # ============================================================
 def plotar_diagrama(resultado, estrutura):
     fig, ax = plt.subplots(figsize=(8, 6))
-
     F_T = resultado["F_T"]
     F_L = resultado["F_L"]
     R = resultado["R"]
@@ -354,56 +362,43 @@ def plotar_diagrama(resultado, estrutura):
     ax.axhline(y=0, color='k', linewidth=0.5, alpha=0.3)
     ax.axvline(x=0, color='k', linewidth=0.5, alpha=0.3)
 
-    ax.arrow(0, 0, F_L / scale, 0,
-             head_width=0.05, head_length=0.05,
+    ax.arrow(0, 0, F_L / scale, 0, head_width=0.05, head_length=0.05,
              fc='blue', ec='blue', linewidth=1.5,
              label=f'Longitudinal: {F_L:.0f} daN')
-    ax.arrow(0, 0, 0, F_T / scale,
-             head_width=0.05, head_length=0.05,
+    ax.arrow(0, 0, 0, F_T / scale, head_width=0.05, head_length=0.05,
              fc='red', ec='red', linewidth=1.5,
              label=f'Transversal: {F_T:.0f} daN')
 
     x_res = (R * np.cos(np.radians(theta_R))) / scale
     y_res = (R * np.sin(np.radians(theta_R))) / scale
-    ax.arrow(0, 0, x_res, y_res,
-             head_width=0.07, head_length=0.07,
+    ax.arrow(0, 0, x_res, y_res, head_width=0.07, head_length=0.07,
              fc='green', ec='green', linewidth=2.5,
              label=f'Resultante: {R:.0f} daN')
 
     if estrutura["tipo_poste"] == "Duplo T" and resultado["theta_face"] is not None:
         tf = resultado["theta_face"]
         tg = tf + 90
-
-        x_l = 1.2 * np.cos(np.radians(tf))
-        y_l = 1.2 * np.sin(np.radians(tf))
+        x_l = 1.2 * np.cos(np.radians(tf)); y_l = 1.2 * np.sin(np.radians(tf))
         ax.plot([-x_l, x_l], [-y_l, y_l], 'purple', linewidth=1.5,
                 linestyle='--', alpha=0.8, label='Face Lisa')
-
-        x_g = 1.2 * np.cos(np.radians(tg))
-        y_g = 1.2 * np.sin(np.radians(tg))
+        x_g = 1.2 * np.cos(np.radians(tg)); y_g = 1.2 * np.sin(np.radians(tg))
         ax.plot([-x_g, x_g], [-y_g, y_g], 'orange', linewidth=1.5,
                 linestyle='--', alpha=0.8, label='Gaveta')
-
         a = 1.0 * (max_val / scale) * 0.6
         b = 0.5 * (max_val / scale) * 0.6
-        el = Ellipse((0, 0), 2 * a, 2 * b, angle=tf,
-                     facecolor='none', edgecolor='gray',
-                     linestyle=':', linewidth=1.5, alpha=0.7)
+        el = Ellipse((0, 0), 2*a, 2*b, angle=tf, facecolor='none',
+                     edgecolor='gray', linestyle=':', linewidth=1.5, alpha=0.7)
         ax.add_patch(el)
 
-    ax.set_xlim(-1.35, 1.35)
-    ax.set_ylim(-1.35, 1.35)
-    ax.set_aspect('equal')
-    ax.grid(True, alpha=0.2)
+    ax.set_xlim(-1.35, 1.35); ax.set_ylim(-1.35, 1.35)
+    ax.set_aspect('equal'); ax.grid(True, alpha=0.2)
     ax.set_xlabel('Longitudinal (X)', fontsize=10)
     ax.set_ylabel('Transversal (Y)', fontsize=10)
     ax.set_title(f'{resultado["LC"]} — R_final = {resultado["R_final"]:.1f} daN',
                  fontsize=11, fontweight='bold')
     ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=8)
-
     ax.text(1.05, 0, '0°', fontsize=7, alpha=0.7)
     ax.text(0, 1.05, '90°', fontsize=7, alpha=0.7)
-
     plt.tight_layout()
     return fig
 
@@ -412,9 +407,13 @@ def plotar_diagrama(resultado, estrutura):
 # ============================================================
 def inicializar_estado():
     defaults = {
-        "texto_colado": "",
         "textarea_pendente": "",
+        "df_dados": None,
+        "_erro_parse": None,
+        "_limpar_textarea_flag": False,
+        "_limpar_tabela_flag": False,
         "estrutura_nome": "",
+        "_estrutura_anterior": "",
         "altura": ALTURA_DEFAULT,
         "fator_cagaco": 0,
         "pressao_vento": 30.0,
@@ -424,7 +423,6 @@ def inicializar_estado():
         "resultados": None,
         "lc_critico": None,
         "lc_grafico": None,
-        "_limpar_textarea_flag": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -436,10 +434,8 @@ def reset_geral():
     inicializar_estado()
 
 def limpar_tabela():
-    # Apenas seta o flag; o reset real acontece no topo do bloco de colagem,
-    # antes do widget ser renderizado (regra do Streamlit).
     st.session_state["_limpar_textarea_flag"] = True
-    st.session_state["texto_colado"] = ""
+    st.session_state["_limpar_tabela_flag"] = True
     st.session_state["resultados"] = None
     st.session_state["lc_critico"] = None
     st.session_state["lc_grafico"] = None
@@ -470,17 +466,145 @@ estrutura_nome = st.selectbox(
 st.session_state["estrutura_nome"] = estrutura_nome
 
 estrutura = None
+
 if estrutura_nome:
-    estrutura = next(e for e in estruturas if e["nome"] == estrutura_nome)
+    estrutura_base = next(e for e in estruturas if e["nome"] == estrutura_nome)
+
+    # Reset dos campos editáveis quando trocar de estrutura
+    if st.session_state.get("_estrutura_anterior") != estrutura_nome:
+        for k in ["edit_tipo_poste", "edit_config",
+                  "edit_dist_pr",
+                  "edit_dist_f1", "edit_dist_f2", "edit_dist_f3",
+                  "edit_dist_f4", "edit_dist_f5", "edit_dist_f6"]:
+            st.session_state.pop(k, None)
+        st.session_state["_estrutura_anterior"] = estrutura_nome
+
+    st.markdown("**1.1 Parâmetros da estrutura (editáveis)**")
+    st.caption(
+        "Os valores abaixo vêm do cadastro (`estruturas.xlsx`), mas podem ser "
+        "ajustados aqui. O cálculo usa os valores editados."
+    )
+
+    # === Tipo de poste + Configuração ===
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        idx_tipo = 0 if estrutura_base["tipo_poste"] == "Circular" else 1
+        tipo_poste_edit = st.selectbox(
+            "Tipo de poste",
+            ["Circular", "Duplo T"],
+            index=idx_tipo,
+            key="edit_tipo_poste"
+        )
+    with col_b:
+        try:
+            idx_conf = CONFIG_OPCOES.index(estrutura_base["config"])
+        except ValueError:
+            idx_conf = 0
+        config_edit = st.selectbox(
+            "Configuração",
+            CONFIG_OPCOES,
+            index=idx_conf,
+            key="edit_config",
+            format_func=lambda c: CONFIG_LABELS.get(c, c)
+        )
+    with col_c:
+        st.write("")  # espaçador visual
+
+    tem_pr = config_edit.endswith("_com_PR")
+    is_duplo = config_edit.startswith("CD_")
+
+    # === Distâncias F1, F2, F3 (sempre) ===
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        dist_f1_edit = st.number_input(
+            "Fase 1 — C1 (m)", min_value=0.0, max_value=30.0, step=0.05,
+            value=float(estrutura_base["dist_f1"]) if "edit_dist_f1" not in st.session_state else st.session_state["edit_dist_f1"],
+            format="%.2f", key="edit_dist_f1"
+        )
+    with col_f2:
+        dist_f2_edit = st.number_input(
+            "Fase 2 — C1 (m)", min_value=0.0, max_value=30.0, step=0.05,
+            value=float(estrutura_base["dist_f2"]) if "edit_dist_f2" not in st.session_state else st.session_state["edit_dist_f2"],
+            format="%.2f", key="edit_dist_f2"
+        )
+    with col_f3:
+        dist_f3_edit = st.number_input(
+            "Fase 3 — C1 (m)", min_value=0.0, max_value=30.0, step=0.05,
+            value=float(estrutura_base["dist_f3"]) if "edit_dist_f3" not in st.session_state else st.session_state["edit_dist_f3"],
+            format="%.2f", key="edit_dist_f3"
+        )
+
+    # === Distâncias F4, F5, F6 (só se CD) ===
+    if is_duplo:
+        col_f4, col_f5, col_f6 = st.columns(3)
+        with col_f4:
+            dist_f4_edit = st.number_input(
+                "Fase 4 — C2 (m)", min_value=0.0, max_value=30.0, step=0.05,
+                value=float(estrutura_base["dist_f4"]) if "edit_dist_f4" not in st.session_state else st.session_state["edit_dist_f4"],
+                format="%.2f", key="edit_dist_f4"
+            )
+        with col_f5:
+            dist_f5_edit = st.number_input(
+                "Fase 5 — C2 (m)", min_value=0.0, max_value=30.0, step=0.05,
+                value=float(estrutura_base["dist_f5"]) if "edit_dist_f5" not in st.session_state else st.session_state["edit_dist_f5"],
+                format="%.2f", key="edit_dist_f5"
+            )
+        with col_f6:
+            dist_f6_edit = st.number_input(
+                "Fase 6 — C2 (m)", min_value=0.0, max_value=30.0, step=0.05,
+                value=float(estrutura_base["dist_f6"]) if "edit_dist_f6" not in st.session_state else st.session_state["edit_dist_f6"],
+                format="%.2f", key="edit_dist_f6"
+            )
+    else:
+        dist_f4_edit = estrutura_base["dist_f4"]
+        dist_f5_edit = estrutura_base["dist_f5"]
+        dist_f6_edit = estrutura_base["dist_f6"]
+
+    # === Distância PR (só se tem PR) ===
+    if tem_pr:
+        dist_pr_edit = st.number_input(
+            "Para-raios — PR1 (m)", min_value=0.0, max_value=30.0, step=0.05,
+            value=float(estrutura_base["dist_pr"]) if "edit_dist_pr" not in st.session_state else st.session_state["edit_dist_pr"],
+            format="%.2f", key="edit_dist_pr"
+        )
+    else:
+        dist_pr_edit = estrutura_base["dist_pr"]
+
+    # === Construir estrutura editada ===
+    estrutura = dict(estrutura_base)
+    estrutura["tipo_poste"] = tipo_poste_edit
+    estrutura["config"] = config_edit
+    estrutura["is_duplo"] = is_duplo
+    estrutura["tem_pr"] = tem_pr
+    estrutura["dist_f1"] = dist_f1_edit
+    estrutura["dist_f2"] = dist_f2_edit
+    estrutura["dist_f3"] = dist_f3_edit
+    estrutura["dist_f4"] = dist_f4_edit
+    estrutura["dist_f5"] = dist_f5_edit
+    estrutura["dist_f6"] = dist_f6_edit
+    estrutura["dist_pr"] = dist_pr_edit
+
     sets_req = SETS_REQUERIDOS[estrutura["config"]]
     st.info(
         f"**{estrutura['tipo_poste']}** — "
-        f"Configuração: **{estrutura['config']}** — "
+        f"Configuração: **{CONFIG_LABELS.get(estrutura['config'], estrutura['config'])}** — "
         f"Sets requeridos na tabela: **{sorted(sets_req)}**"
     )
 
 st.markdown("---")
 st.subheader("📋 2. Cole a tabela do PLS-CADD")
+
+# Reset de flags — sempre antes de instanciar widgets
+if st.session_state.get("_limpar_textarea_flag"):
+    st.session_state["textarea_pendente"] = ""
+    st.session_state["_limpar_textarea_flag"] = False
+
+if st.session_state.get("_limpar_tabela_flag"):
+    st.session_state["df_dados"] = None
+    st.session_state["_erro_parse"] = None
+    if "editor_dados" in st.session_state:
+        del st.session_state["editor_dados"]
+    st.session_state["_limpar_tabela_flag"] = False
 
 if estrutura is not None:
     st.caption(
@@ -488,11 +612,6 @@ if estrutura is not None:
         "Ordem esperada: LC | Set | Phase | Attach | S_Vert | S_Trans | S_Long | "
         "B_Vert | B_Trans | B_Long | A_Vert | A_Trans | A_Long | Warnings"
     )
-
-    # Reset do text_area ANTES do widget ser renderizado (regra Streamlit)
-    if st.session_state.get("_limpar_textarea_flag", False):
-        st.session_state["textarea_pendente"] = ""
-        st.session_state["_limpar_textarea_flag"] = False
 
     st.text_area(
         "Cole aqui (Ctrl+V do Excel):",
@@ -503,45 +622,84 @@ if estrutura is not None:
     cbtn_ap, cbtn_limpar_campo = st.columns([1, 1])
     with cbtn_ap:
         if st.button("📥 Aplicar tabela", use_container_width=True):
-            st.session_state["texto_colado"] = st.session_state.get("textarea_pendente", "")
-            st.session_state["resultados"] = None
-            st.session_state["lc_critico"] = None
-            st.session_state["lc_grafico"] = None
+            df_parsed, erro = parsear_tabela(st.session_state.get("textarea_pendente", ""))
+            if erro:
+                st.session_state["_erro_parse"] = erro
+            else:
+                st.session_state["_erro_parse"] = None
+                st.session_state["df_dados"] = df_parsed
+                if "editor_dados" in st.session_state:
+                    del st.session_state["editor_dados"]
+                st.session_state["resultados"] = None
             st.rerun()
     with cbtn_limpar_campo:
         if st.button("🗑️ Limpar campo", use_container_width=True):
             st.session_state["_limpar_textarea_flag"] = True
-            st.session_state["texto_colado"] = ""
+            st.session_state["_limpar_tabela_flag"] = True
             st.session_state["resultados"] = None
             st.session_state["lc_critico"] = None
             st.session_state["lc_grafico"] = None
             st.rerun()
+
+    if st.session_state.get("_erro_parse"):
+        st.error(f"❌ {st.session_state['_erro_parse']}")
 
     df = None
     sets_presentes = set()
     lcs_disponiveis = []
 
-    if st.session_state["texto_colado"].strip():
-        df, erro = parsear_tabela(st.session_state["texto_colado"])
-        if erro:
-            st.error(f"❌ {erro}")
+    if st.session_state.get("df_dados") is not None:
+        st.markdown("---")
+        st.subheader("📝 2.1 Dados colados (editáveis)")
+        st.caption(
+            "Você pode editar qualquer célula se necessário. "
+            "As alterações são usadas diretamente no cálculo. "
+            "Para adicionar/remover linhas, edite o texto acima e clique em "
+            "**📥 Aplicar tabela** novamente."
+        )
+
+        df_editavel = st.data_editor(
+            st.session_state["df_dados"],
+            key="editor_dados",
+            num_rows="fixed",
+            use_container_width=True,
+            column_config={
+                "LC":       st.column_config.TextColumn("LC"),
+                "Set":      st.column_config.NumberColumn("Set", step=1, format="%d", min_value=0),
+                "Phase":    st.column_config.NumberColumn("Phase", step=1, format="%d", min_value=0),
+                "Attach":   st.column_config.TextColumn("Attach"),
+                "S_Vert":   st.column_config.NumberColumn("S_Vert", format="%.1f"),
+                "S_Trans":  st.column_config.NumberColumn("S_Trans", format="%.1f"),
+                "S_Long":   st.column_config.NumberColumn("S_Long", format="%.1f"),
+                "B_Vert":   st.column_config.NumberColumn("B_Vert", format="%.1f"),
+                "B_Trans":  st.column_config.NumberColumn("B_Trans", format="%.1f"),
+                "B_Long":   st.column_config.NumberColumn("B_Long", format="%.1f"),
+                "A_Vert":   st.column_config.NumberColumn("A_Vert", format="%.1f"),
+                "A_Trans":  st.column_config.NumberColumn("A_Trans", format="%.1f"),
+                "A_Long":   st.column_config.NumberColumn("A_Long", format="%.1f"),
+                "Warnings": st.column_config.TextColumn("Warnings"),
+            },
+        )
+
+        # Revalidação sobre o DataFrame editado
+        sets_presentes = detectar_sets(df_editavel)
+        sets_req = SETS_REQUERIDOS[estrutura["config"]]
+
+        if sets_presentes != sets_req:
+            faltam = sets_req - sets_presentes
+            sobram = sets_presentes - sets_req
+            msg = "❌ Incompatibilidade de sets após edição."
+            if faltam: msg += f"  Faltam: {sorted(faltam)}."
+            if sobram: msg += f"  Sobram: {sorted(sobram)}."
+            st.error(msg)
+            df = None
         else:
-            sets_presentes = detectar_sets(df)
-            sets_req = SETS_REQUERIDOS[estrutura["config"]]
-            if sets_presentes != sets_req:
-                faltam = sets_req - sets_presentes
-                sobram = sets_presentes - sets_req
-                msg = "❌ Incompatibilidade de sets."
-                if faltam: msg += f"  Faltam: {sorted(faltam)}."
-                if sobram: msg += f"  Sobram: {sorted(sobram)}."
-                st.error(msg)
-                df = None
-            else:
-                st.success(
-                    f"✅ Tabela válida — {len(df)} linhas, "
-                    f"sets {sorted(sets_presentes)}"
-                )
-                lcs_disponiveis = listar_lcs_disponiveis(sets_presentes)
+            st.success(
+                f"✅ Tabela válida — {len(df_editavel)} linhas, "
+                f"sets {sorted(sets_presentes)}"
+            )
+            df = df_editavel
+            lcs_disponiveis = listar_lcs_disponiveis(sets_presentes)
 
     if df is not None and lcs_disponiveis:
         st.markdown("---")
@@ -571,20 +729,16 @@ if estrutura is not None:
                 key="sel_altura"
             )
             st.session_state["altura"] = altura
-
         with c2:
             fator_cagaco = st.number_input(
-                "Fator cagaço (%)",
-                min_value=0, max_value=20,
+                "Fator cagaço (%)", min_value=0, max_value=20,
                 value=st.session_state["fator_cagaco"], step=1,
                 key="inp_cagaco"
             )
             st.session_state["fator_cagaco"] = fator_cagaco
-
         with c3:
             pressao_vento = st.number_input(
-                "Pressão de vento (kgf/m²)",
-                min_value=0.0, max_value=200.0,
+                "Pressão de vento (kgf/m²)", min_value=0.0, max_value=200.0,
                 value=st.session_state["pressao_vento"], step=1.0,
                 key="inp_vento"
             )
@@ -612,16 +766,14 @@ if estrutura is not None:
         cbtn1, cbtn2, cbtn3 = st.columns(3)
         with cbtn1:
             botao_calcular = st.button(
-                "🔍 Calcular",
-                type="primary",
-                use_container_width=True,
+                "🔍 Calcular", type="primary", use_container_width=True,
                 disabled=(not any(st.session_state["lcs_marcados"].values()))
             )
             if botao_calcular:
                 lcs_sel = [lc for lc, v in st.session_state["lcs_marcados"].items() if v]
                 resultados = []
                 for lc_nome in lcs_sel:
-                    df_lc = df[df["LC"] == lc_nome]
+                    df_lc = df[df["LC"].astype(str).str.strip() == lc_nome]
                     if df_lc.empty:
                         continue
                     res = processar_lc(
@@ -644,7 +796,6 @@ if estrutura is not None:
             if st.button("🧹 Limpar tabela e resultados", use_container_width=True):
                 limpar_tabela()
                 st.rerun()
-
         with cbtn3:
             if st.button("🔄 Reset geral", use_container_width=True):
                 reset_geral()
@@ -656,7 +807,6 @@ if estrutura is not None:
 if st.session_state["resultados"]:
     st.markdown("---")
     st.subheader("📊 Resultados")
-
     resultados = st.session_state["resultados"]
 
     linhas = []
@@ -685,12 +835,9 @@ if st.session_state["resultados"]:
     crit = next(r for r in resultados if r["LC"] == st.session_state["lc_critico"])
     st.markdown("### 🎯 Resumo")
     cA, cB, cC = st.columns(3)
-    with cA:
-        st.metric("Poste recomendado", f"{poste_final} daN")
-    with cB:
-        st.metric("LC crítico", crit["LC"])
-    with cC:
-        st.metric("R_final do crítico", f"{crit['R_final']:.1f} daN")
+    with cA: st.metric("Poste recomendado", f"{poste_final} daN")
+    with cB: st.metric("LC crítico", crit["LC"])
+    with cC: st.metric("R_final do crítico", f"{crit['R_final']:.1f} daN")
 
     if any(r["estourou"] for r in resultados):
         st.warning("⚠️ Pelo menos um LC ultrapassou 4000 daN. Poste comercial pode ser insuficiente.")
