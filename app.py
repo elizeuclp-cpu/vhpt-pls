@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-from io import StringIO
+from io import StringIO, BytesIO
 import os
 
 st.set_page_config(
@@ -74,7 +74,6 @@ LCS_DISPONIVEIS = [
 ]
 TODAS_LCS = [lc['nome'] for lc in LCS_DISPONIVEIS]
 
-# Colunas da tabela em massa (18 colunas do PLS-CADD)
 COLUNAS_MASSA = [
     "Sequencial", "EstruturaAltura", "LC_num", "WC_num", "LC",
     "Set", "Phase", "Attach",
@@ -255,7 +254,6 @@ def parsear_tabela_massa(texto):
     return df, None, n_linhas, n_estruturas
 
 def parsear_estrutura_altura(texto):
-    """Retorna (nome, altura) ou (texto, None) se inválido."""
     texto = str(texto).strip()
     if "." not in texto:
         return texto, None
@@ -274,7 +272,7 @@ def locacao_para_display(tipo_poste, locacao_raw):
         return "Topo para bissetriz"
     if locacao_raw in ["L2", "L4"]:
         return "Gaveta para bissetriz"
-    return "N/A"  # L5 ou outro → não definido
+    return "N/A"
 
 # ============================================================
 # NÚCLEO DE CÁLCULO
@@ -298,7 +296,6 @@ def fator_correcao_duplo_t(theta_res, theta_face):
     return 1.0 / np.sqrt((np.cos(rad) / a) ** 2 + (np.sin(rad) / b) ** 2)
 
 def calcular_forca_vento_poste(tipo_poste, altura, pressao_vento):
-    """INATIVA. Preparada para uso futuro."""
     h = altura
     if tipo_poste == "Duplo T":
         num = h**2 * (0.34524 + 0.01134 * h) * (1.1592 + 0.0252 * h)
@@ -455,7 +452,6 @@ def plotar_diagrama(resultado, estrutura):
 # ============================================================
 def inicializar_estado():
     defaults = {
-        # Individual
         "textarea_pendente": "",
         "df_dados": None,
         "_erro_parse": None,
@@ -475,7 +471,7 @@ def inicializar_estado():
         "lc_critico": None,
         "lc_grafico": None,
         # Massa
-        "massa_etapa": "colar",     # colar | confirmar | conferir | resultado
+        "massa_etapa": "colar",
         "massa_textarea": "",
         "massa_erro_parse": None,
         "massa_df_parse": None,
@@ -500,11 +496,12 @@ def reset_geral():
     inicializar_estado()
 
 def reset_massa():
-    chaves_massa = [k for k in st.session_state if k.startswith("massa_") or k == "_massa_editor"]
+    chaves_massa = [k for k in st.session_state if k.startswith("massa_") or k == "massa_editor"]
     for k in chaves_massa:
-        del st.session_state[k]
-    if "_massa_editor" in st.session_state:
-        del st.session_state["_massa_editor"]
+        if k in st.session_state:
+            del st.session_state[k]
+    if "massa_editor" in st.session_state:
+        del st.session_state["massa_editor"]
     inicializar_estado()
 
 # ============================================================
@@ -804,7 +801,6 @@ def render_individual_tab(estruturas_liberadas):
                     reset_geral()
                     st.rerun()
 
-    # Resultados
     if st.session_state["resultados"]:
         st.markdown("---")
         st.subheader("📊 Resultados")
@@ -881,7 +877,6 @@ def construir_conferencia(df_parse, estruturas_dict):
         config = cadastro["config"]
         locacao = locacao_para_display(tipo, cadastro["locacao_raw"])
 
-        # Estado
         if cadastro["liberacao"] != "SIM":
             estado, motivo = "⚠️ Não liberada", "Estrutura existe mas não está liberada"
         elif altura is None or altura not in ALTURAS_DISPONIVEIS:
@@ -905,7 +900,6 @@ def construir_conferencia(df_parse, estruturas_dict):
     return pd.DataFrame(rows)
 
 def recomputar_estado(row, estruturas_dict):
-    """Recalcula estado a partir dos valores atuais (editados)."""
     nome = row["Estrutura"]
     altura = row["Altura"]
     tipo = row["Tipo"]
@@ -1036,7 +1030,6 @@ def _massa_etapa_conferir(estruturas_dict):
         },
     )
 
-    # Recalcular estados com base no que está editado
     estados, motivos = [], []
     for _, row in df_editado.iterrows():
         estado, motivo = recomputar_estado(row, estruturas_dict)
@@ -1139,11 +1132,11 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
                 "Tipo": tipo, "Config": config,
                 "Estado": estado,
                 "Poste": "", "LC crítico": "", "R_final (daN)": "",
+                "Ultrapassou 4000": "—",
                 "Motivo": motivo,
             })
             continue
 
-        # Determinar theta_face
         if tipo == "Circular":
             theta_face = None
         elif locacao == "Topo para bissetriz":
@@ -1151,7 +1144,6 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
         else:
             theta_face = 0.0
 
-        # Construir estrutura
         estrutura_calc = {
             "tipo_poste": tipo,
             "dist_f1": row["dist_f1"], "dist_f2": row["dist_f2"], "dist_f3": row["dist_f3"],
@@ -1161,7 +1153,6 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
 
         df_grupo = df_parse[df_parse["Sequencial"] == seq]
 
-        # Processar cada LC
         resultados_lc = []
         for lc_nome in lcs_sel:
             df_lc = df_grupo[df_grupo["LC"].astype(str).str.strip() == lc_nome]
@@ -1178,12 +1169,14 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
                 "Tipo": tipo, "Config": config,
                 "Estado": "⚠️ Sem resultados",
                 "Poste": "", "LC crítico": "", "R_final (daN)": "",
+                "Ultrapassou 4000": "—",
                 "Motivo": "Nenhum LC processado",
             })
             continue
 
         crit = max(resultados_lc, key=lambda x: x["R_final"])
         poste = max(r["poste"] for r in resultados_lc)
+        estourou = any(r["estourou"] for r in resultados_lc)
 
         resultados.append({
             "Sequencial": seq, "Estrutura": nome, "Altura": altura,
@@ -1192,6 +1185,7 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
             "Poste": poste,
             "LC crítico": crit["LC"],
             "R_final (daN)": f"{crit['R_final']:.1f}",
+            "Ultrapassou 4000": "Sim" if estourou else "Não",
             "Motivo": "",
         })
 
@@ -1210,22 +1204,37 @@ def _massa_etapa_resultado():
         return
 
     n_total = len(df)
-    n_calc = (df["Estado"] == "✅ Calculada").sum()
+    n_calc = int((df["Estado"] == "✅ Calculada").sum())
     n_nc = n_total - n_calc
     calculadas = df[df["Estado"] == "✅ Calculada"]
     poste_max = calculadas["Poste"].max() if not calculadas.empty else "—"
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("Total", n_total)
-    with c2: st.metric("Calculadas", int(n_calc))
-    with c3: st.metric("Não calculadas", int(n_nc))
+    with c2: st.metric("Calculadas", n_calc)
+    with c3: st.metric("Não calculadas", n_nc)
     with c4: st.metric("Poste máx (daN)", poste_max if poste_max != "—" else "—")
+
+    if "Ultrapassou 4000" in df.columns:
+        n_estourou = int((df["Ultrapassou 4000"] == "Sim").sum())
+        if n_estourou > 0:
+            st.warning(
+                f"⚠️ **{n_estourou}** estrutura(s) ultrapassou(aram) **4000 daN**. "
+                "Poste comercial pode ser insuficiente para essas estruturas."
+            )
 
     st.markdown("---")
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Exportar CSV", csv, "dimensionamento_massa.csv", "text/csv")
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Dimensionamento")
+    st.download_button(
+        "📥 Exportar XLSX",
+        buffer.getvalue(),
+        "dimensionamento_massa.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
     st.markdown("---")
     if st.button("🔄 Nova análise em massa", use_container_width=True):
