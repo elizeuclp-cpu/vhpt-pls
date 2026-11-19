@@ -1637,6 +1637,7 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
             "Sequencial": seq, "Estrutura": nome, "Altura": altura,
             "Tipo": tipo, "Config": config,
             "Estado": "✅ Calculada",
+            "Poste central": crit["poste_cen"],
             "Poste lateral": crit["poste_lat"],
             "Poste central": crit["poste_cen"],
             "Poste consolidado": crit["poste_cons"],
