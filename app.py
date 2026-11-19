@@ -1289,8 +1289,8 @@ def _massa_etapa_conferir(estruturas_dict):
 
     # ---------------- ORIENTAÇÕES DE USO ----------------
     st.markdown("### ⚠️ Orientações de uso")
-        with st.expander("📖 Leia atentamente antes de prosseguir (clique para abrir)", expanded=True):
-        st.markdown("""
+    with st.expander("📖 Leia atentamente antes de prosseguir (clique para abrir)", expanded=True):
+    st.markdown("""
 **1. Cadastre todas as 20 hipóteses de carregamento.**
 Para um dimensionamento correto e eficiente da estrutura, é essencial que **todas as 20 hipóteses** de LC estejam presentes no lote. Hipóteses faltantes não são processadas e o dimensionamento refletirá apenas as que vierem.
 
