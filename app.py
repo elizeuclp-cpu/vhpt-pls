@@ -1025,10 +1025,7 @@ def render_individual_tab(estruturas_liberadas):
 
             # ---------- helper: monta 1 linha no formato do caso de 1 poste ----------
             def _linha_resultado(res, rotulo_poste=None):
-                d = {}
-                if rotulo_poste is not None:
-                    d["Poste"] = rotulo_poste
-                d.update({
+                d = {
                     "LC": res["LC"],
                     "V_total": f"{res['V_total']:.1f}",
                     "T_back": f"{res['T_back']:.1f}", "T_ahead": f"{res['T_ahead']:.1f}",
@@ -1041,7 +1038,9 @@ def render_individual_tab(estruturas_liberadas):
                     "Divisor": f"{res['divisor']:.2f}",
                     "R_final (daN)": f"{res['R_final']:.1f}",
                     "Poste": res["poste"],
-                })
+                }
+                if rotulo_poste is not None:
+                    d["Poste (id)"] = rotulo_poste
                 return d
 
             # ==================================================
@@ -1089,10 +1088,7 @@ def render_individual_tab(estruturas_liberadas):
             if tem_pr:
                 poste_lat_fin = max(r["poste_lateral"] for r in resultados)
                 poste_cen_fin = max(r["poste_central"] for r in resultados)
-                poste_str_fin = (
-                    f"2× {poste_lat_fin} daN (laterais) + "
-                    f"1× {poste_cen_fin} daN (central)"
-                )
+                poste_str_fin = f"2× {poste_lat_fin} daN + 1× {poste_cen_fin} daN"
             else:
                 poste_fin = max(r["poste_max"] for r in resultados)
                 poste_str_fin = f"3× {poste_fin} daN"
