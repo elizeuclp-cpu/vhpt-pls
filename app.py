@@ -1290,7 +1290,7 @@ def _massa_etapa_conferir(estruturas_dict):
     # ---------------- ORIENTAÇÕES DE USO ----------------
     st.markdown("### ⚠️ Orientações de uso")
     with st.expander("📖 Leia atentamente antes de prosseguir (clique para abrir)", expanded=True):
-    st.markdown("""
+        st.markdown("""
 **1. Cadastre todas as 20 hipóteses de carregamento.**
 Para um dimensionamento correto e eficiente da estrutura, é essencial que **todas as 20 hipóteses** de LC estejam presentes no lote. Hipóteses faltantes não são processadas e o dimensionamento refletirá apenas as que vierem.
 
@@ -1304,40 +1304,13 @@ O VHPT 2.0 identifica cada hipótese **pelo nome exato**, sem tolerância a dife
 - Se `VENT MAX` virar `VENTO MAX` ou similar → **o vento no fuste não será aplicado**, mesmo com o checkbox marcado
 - Se `QUEBRA PR1 A` (ou qualquer QUEBRA) for renomeado → a hipótese mais crítica do PR **não será calculada**
 
-**4. Formato do `Str. Name` no PLS-CADD.**
-O `Str. Name` de cada estrutura deve seguir o formato **`NomeEstrutura.AlturaEmDecímetros`**, onde:
-- **`NomeEstrutura`** é o nome **exato** cadastrado na planilha `estruturas.xlsx`
-- **`AlturaEmDecímetros`** são **3 dígitos** representando a altura × 10 (ex.: `220` = 22,0 m)
+**4. A ordem dos critérios no menu Criteria do PLS-CADD não afeta o cálculo**, só a ordem de exibição nos resultados. Comparar dois lotes exportados em ordens diferentes mostrará os mesmos valores, apenas em sequências diferentes.
 
-Exemplo: `UA-GV-PR.220`
+**5. Não misture trechos com configurações de circuito diferentes no mesmo lote** (ex.: estruturas `CD_com_PR` com Sets {1, 2, 4} e estruturas `CS_com_PR` com Sets {1, 4}). Processe em lotes separados. O cálculo em massa não valida a compatibilidade de sets por estrutura e pode **subestimar** os esforços de estruturas com sets incompletos.
 
-Se o nome não bater com o cadastro → estado **❌ Não homologada**.
-Se a altura estiver fora da lista (`18, 20, 22, 24, 26, 28, 30, 32`) → estado **🔶 Altura incompatível**.
-""")
+**6. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos postes laterais precisa ser informada **manualmente** na coluna **Altura lateral** — o PLS-CADD não tem essa informação.
 
-        if os.path.exists(CAMINHO_ESTRUTURAS):
-            with open(CAMINHO_ESTRUTURAS, "rb") as _f:
-                st.download_button(
-                    "📥 Baixar estruturas.xlsx (conferir nomes homologados)",
-                    _f.read(),
-                    "estruturas.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="massa_dl_estruturas",
-                )
-        else:
-            st.warning(
-                "⚠️ Planilha `estruturas.xlsx` não encontrada no diretório do app. "
-                "Contate o administrador."
-            )
-
-        st.markdown("""
-**5. A ordem dos critérios no menu Criteria do PLS-CADD não afeta o cálculo**, só a ordem de exibição nos resultados. Comparar dois lotes exportados em ordens diferentes mostrará os mesmos valores, apenas em sequências diferentes.
-
-**6. Não misture trechos com configurações de circuito diferentes no mesmo lote** (ex.: estruturas `CD_com_PR` com Sets {1, 2, 4} e estruturas `CS_com_PR` com Sets {1, 4}). Processe em lotes separados. O cálculo em massa não valida a compatibilidade de sets por estrutura e pode **subestimar** os esforços de estruturas com sets incompletos.
-
-**7. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos postes laterais precisa ser informada **manualmente** na coluna **Altura lateral** — o PLS-CADD não tem essa informação.
-
-**8. Configuração dos Sets — todas as estruturas, sem exceção:**
+**7. Configuração dos Sets — todas as estruturas, sem exceção:**
 
 | Set | Destinação |
 |---|---|
