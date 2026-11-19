@@ -86,6 +86,10 @@ CAMINHO_ESTRUTURAS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "estruturas.xlsx"
 )
 
+CAMINHO_STRUCTURE_LOADS = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "Structure Loads.xlsx"
+)
+
 # ============================================================
 # CADASTRO DE ESTRUTURAS
 # ============================================================
@@ -370,9 +374,6 @@ def processar_lc(nome_lc, df_lc, estrutura, altura, fator_cagaco_pct,
         F_vento_poste = calcular_forca_vento_poste(
             estrutura["tipo_poste"], altura, pressao_vento
         )
-        # Correção: vento acompanha o sinal de F_T dos cabos.
-        # Se F_T dos cabos for negativo, o vento age no mesmo sentido (mais negativo),
-        # de modo que sua contribuição SEMPRE aumente o módulo da resultante.
         if F_T < 0:
             F_vento_poste = -F_vento_poste
         F_T += F_vento_poste
@@ -416,7 +417,6 @@ def processar_lc(nome_lc, df_lc, estrutura, altura, fator_cagaco_pct,
 
 def processar_lc_poste(df_lc_completo, nome_lc, chaves_poste, estrutura, altura,
                        fator_cagaco_pct, theta_face, considerar_vento, pressao_vento):
-    """Filtra o DataFrame do LC para as chaves (Set,Phase) do poste e calcula."""
     if df_lc_completo.empty:
         return None
     mask = df_lc_completo.apply(
@@ -430,7 +430,6 @@ def processar_lc_poste(df_lc_completo, nome_lc, chaves_poste, estrutura, altura,
 
 def calcular_3_postes(df_lc, lc_nome, estrutura, altura_central, altura_lateral,
                       fator_cagaco, theta_face, considerar_vento, pressao_vento):
-    """Calcula os 3 postes independentes para um LC."""
     tem_pr = estrutura["tem_pr"]
 
     chaves_p1 = {(1, 1)}
@@ -965,18 +964,12 @@ def render_individual_tab(estruturas_liberadas):
                     reset_geral()
                     st.rerun()
 
-    # ============================================================
-    # RESULTADOS (INALTERADO)
-    # ============================================================
     if st.session_state["resultados"]:
         st.markdown("---")
         st.subheader("📊 Resultados")
         resultados = st.session_state["resultados"]
         num_postes = estrutura.get("num_postes", 1) if estrutura else 1
 
-        # ================================================
-        # 1 POSTE
-        # ================================================
         if num_postes == 1:
             linhas = []
             for r in resultados:
@@ -1018,30 +1011,21 @@ def render_individual_tab(estruturas_liberadas):
             st.pyplot(fig)
             plt.close(fig)
 
-        # ================================================
-        # 3 POSTES
-        # ================================================
         elif num_postes == 3:
             tem_pr = estrutura["tem_pr"]
 
-            # Tabela consolidada por LC
             linhas = []
             for r in resultados:
                 linha = {
                     "LC": r["LC"],
                     "Poste lateral": r["poste_lateral"],
+                    "Poste central": r["poste_central"],
+                    "Consolidado": r["poste_str"],
+                    "R_final máx (daN)": f"{r['R_final_max']:.1f}",
                 }
-                if tem_pr:
-                    linha["Poste central"] = r["poste_central"]
-                    linha["Consolidado"] = r["poste_str"]
-                else:
-                    linha["Poste central"] = r["poste_central"]
-                    linha["Consolidado"] = r["poste_str"]
-                linha["R_final máx (daN)"] = f"{r['R_final_max']:.1f}"
                 linhas.append(linha)
             st.dataframe(pd.DataFrame(linhas), use_container_width=True, hide_index=True)
 
-            # Consolidação final
             if tem_pr:
                 poste_lateral_final = max(r["poste_lateral"] for r in resultados)
                 poste_central_final = max(r["poste_central"] for r in resultados)
@@ -1060,7 +1044,6 @@ def render_individual_tab(estruturas_liberadas):
             if any(r["estourou"] for r in resultados):
                 st.warning("⚠️ Pelo menos um LC ultrapassou 4000 daN.")
 
-            # Diagramas por poste (do LC crítico)
             st.markdown("### 📈 Diagramas vetoriais (LC crítico)")
             crit_res = next(r for r in resultados if r["LC"] == st.session_state["lc_critico"])
 
@@ -1078,17 +1061,15 @@ def render_individual_tab(estruturas_liberadas):
                         plt.close(fig)
 
 # ============================================================
-# TAB: MASSA — COM ALTERAÇÕES PARA 3 POSTES
+# TAB: MASSA
 # ============================================================
 def _calcular_altura_lateral_inicial(cadastro, altura_central):
-    """Regra inicial da coluna Altura lateral conforme o cadastro."""
     num_postes = cadastro.get("num_postes", 1)
     tem_pr = cadastro.get("tem_pr", False)
     if num_postes != 3:
         return "N/A"
     if tem_pr:
         return ""
-    # 3 postes sem PR: cópia da central
     if altura_central is None or pd.isna(altura_central):
         return "N/A"
     try:
@@ -1097,7 +1078,6 @@ def _calcular_altura_lateral_inicial(cadastro, altura_central):
         return "N/A"
 
 def _aplicar_regra_altura_lateral(df_editado, estruturas_dict):
-    """Reaplica a regra da Altura lateral após edição do usuário."""
     df = df_editado.copy()
     for idx in df.index:
         nome = df.at[idx, "Estrutura"]
@@ -1118,7 +1098,6 @@ def _aplicar_regra_altura_lateral(df_editado, estruturas_dict):
                     df.at[idx, "Altura lateral"] = str(float(val_central))
                 except (ValueError, TypeError):
                     df.at[idx, "Altura lateral"] = "N/A"
-        # se 3p com PR: mantém o que o usuário digitou
     return df
 
 def construir_conferencia(df_parse, estruturas_dict):
@@ -1197,7 +1176,6 @@ def recomputar_estado(row, estruturas_dict):
     if tipo == "Duplo T" and locacao not in ["Topo para bissetriz", "Gaveta para bissetriz"]:
         return "🟣 Locação não definida", f"Locacao '{locacao}' não mapeada"
 
-    # Nova validação: 3 postes com PR exige altura lateral válida
     if cadastro.get("num_postes", 1) == 3 and cadastro.get("tem_pr", False):
         al_txt = "" if altura_lateral is None else str(altura_lateral).strip()
         if al_txt == "" or al_txt.upper() == "N/A":
@@ -1224,7 +1202,117 @@ def render_massa_tab(estruturas_dict):
         _massa_etapa_resultado()
 
 def _massa_etapa_colar():
-    st.subheader("📋 1. Cole a tabela em massa")
+    st.subheader("📋 1. Orientações de uso e colagem da tabela")
+
+    with st.expander("📖 Leia atentamente as orientações de uso antes de prosseguir", expanded=True):
+        st.markdown("""
+**1. Cadastre todas as 20 hipóteses de carregamento.**
+Hipóteses faltantes não são processadas e o dimensionamento refletirá apenas as que vierem — o que tende a **subestimar** o poste necessário.
+
+**2. Use exatamente estes nomes.**
+O VHPT 2.0 identifica cada hipótese **pelo nome exato**, sem tolerância a diferenças de maiúsculas/minúsculas, acentos, espaços ou pontuação. Nomes diferentes fazem a hipótese ser **ignorada** no cálculo.
+
+~~~
+EDS
+TEMP MÍM
+VENT MAX
+QUEBRA C1 FA B
+QUEBRA C1 FA A
+QUEBRA C1 FB B
+QUEBRA C1 FB A
+QUEBRA C1 FC B
+QUEBRA C1 FC A
+QUEBRA C2 FA B
+QUEBRA C2 FA A
+QUEBRA C2 FB B
+QUEBRA C2 FB A
+QUEBRA C2 FC B
+QUEBRA C2 FC A
+QUEBRA PR1 B
+QUEBRA PR1 A
+QUEBRA PR2 B
+QUEBRA PR2 A
+MONTAGEM
+~~~
+
+**3. Casos críticos de renomeação:**
+- `EDS` renomeado → esforço de EDS recebe **40% de sobrecarga** indevidamente
+- `VENT MAX` renomeado → **vento no fuste não é aplicado**
+- Qualquer `QUEBRA` renomeado → hipótese **não é calculada**
+
+**4. Cadastre as hipóteses no PLS-CADD conforme o arquivo padrão.**
+O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão nos itens 2 e 3.
+""")
+
+        if os.path.exists(CAMINHO_STRUCTURE_LOADS):
+            with open(CAMINHO_STRUCTURE_LOADS, "rb") as _f:
+                st.download_button(
+                    "📥 Baixar Structure Loads.xlsx (padrão obrigatório)",
+                    _f.read(),
+                    "Structure Loads.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="massa_dl_structure_loads",
+                )
+        else:
+            st.warning(
+                "⚠️ Arquivo `Structure Loads.xlsx` não encontrado no diretório do app. "
+                "Contate o administrador."
+            )
+
+        st.markdown("""
+**5. Formato do `Str. Name`.**
+Formato obrigatório: **`NomeEstrutura.AlturaEmDecímetros`**
+- `NomeEstrutura` = nome **exato** cadastrado em `estruturas.xlsx`
+- `AlturaEmDecímetros` = **3 dígitos**, altura × 10 (ex.: `220` = 22,0 m)
+
+Exemplo: `UA-GV-PR.220`
+
+Nome divergente → **❌ Não homologada**. Altura fora da lista (`18, 20, 22, 24, 26, 28, 30, 32`) → **🔶 Altura incompatível**.
+""")
+
+        if os.path.exists(CAMINHO_ESTRUTURAS):
+            with open(CAMINHO_ESTRUTURAS, "rb") as _f:
+                st.download_button(
+                    "📥 Baixar estruturas.xlsx (conferir nomes homologados)",
+                    _f.read(),
+                    "estruturas.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="massa_dl_estruturas",
+                )
+        else:
+            st.warning(
+                "⚠️ Planilha `estruturas.xlsx` não encontrada no diretório do app. "
+                "Contate o administrador."
+            )
+
+        st.markdown("""
+**6. A ordem dos critérios no menu Criteria não afeta o cálculo**, só a ordem de exibição nos resultados.
+
+**7. Não misture trechos com configurações de circuito diferentes no mesmo lote** (`CD_com_PR` com Sets {1, 2, 4} + `CS_com_PR` com Sets {1, 4}). Processe em lotes separados — o cálculo em massa não valida compatibilidade de sets e pode **subestimar** os esforços.
+
+**8. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos laterais precisa ser informada manualmente na coluna **Altura lateral**.
+
+**9. Configuração dos Sets — todas as estruturas, sem exceção:**
+
+| Set | Destinação |
+|---|---|
+| **1** | Condutores do **circuito 1** |
+| **2** | Condutores do **circuito 2** (se houver) |
+| **4** | Cabo **para-raios 1** (se houver) |
+| **5** | Cabo **para-raios 2** (se houver) |
+
+Sets trocados ou fora dessa numeração fazem o VHPT 2.0 atribuir esforços à estrutura errada — **sub ou superdimensionamento silencioso**.
+""")
+
+    st.session_state["massa_confirmou_orientacoes"] = st.checkbox(
+        "✅ Li e entendi as orientações de uso acima. Estou ciente de que o uso "
+        "incorreto da ferramenta pode gerar dimensionamento inadequado.",
+        value=st.session_state.get("massa_confirmou_orientacoes", False),
+        key="massa_chk_confirmacao",
+    )
+
+    st.markdown("---")
+    st.subheader("📋 2. Cole a tabela em massa")
     st.caption(
         "Cole a tabela do PLS-CADD (18 colunas, com Str. No. e Str. Name). "
         "A coluna 'Str. Name' deve vir no formato `Nome.Altura×10` (ex.: `UA-GV-PR.220`)."
@@ -1278,7 +1366,7 @@ def _massa_etapa_confirmar():
             st.rerun()
 
 def _massa_etapa_conferir(estruturas_dict):
-    st.subheader("📝 2. Planilha de conferência")
+    st.subheader("📝 3. Planilha de conferência")
 
     if st.session_state.get("massa_df_conf_source") is None:
         st.error("Erro interno: planilha não construída.")
@@ -1287,49 +1375,18 @@ def _massa_etapa_conferir(estruturas_dict):
             st.rerun()
         return
 
-    # ---------------- ORIENTAÇÕES DE USO ----------------
-    st.markdown("### ⚠️ Orientações de uso")
-    with st.expander("📖 Leia atentamente antes de prosseguir (clique para abrir)", expanded=True):
-        st.markdown("""
-**1. Cadastre todas as 20 hipóteses de carregamento.**
-Para um dimensionamento correto e eficiente da estrutura, é essencial que **todas as 20 hipóteses** de LC estejam presentes no lote. Hipóteses faltantes não são processadas e o dimensionamento refletirá apenas as que vierem.
-
-**2. Use exatamente estes nomes para as 20 hipóteses.**
-O VHPT 2.0 identifica cada hipótese **pelo nome exato**, sem tolerância a diferenças de maiúsculas/minúsculas, acentos, espaços ou pontuação. Nomes diferentes fazem a hipótese ser **ignorada** no cálculo, o que pode subestimar o poste.
-
-`EDS · TEMP MÍM · VENT MAX · QUEBRA C1 FA B · QUEBRA C1 FA A · QUEBRA C1 FB B · QUEBRA C1 FB A · QUEBRA C1 FC B · QUEBRA C1 FC A · QUEBRA C2 FA B · QUEBRA C2 FA A · QUEBRA C2 FB B · QUEBRA C2 FB A · QUEBRA C2 FC B · QUEBRA C2 FC A · QUEBRA PR1 B · QUEBRA PR1 A · QUEBRA PR2 B · QUEBRA PR2 A · MONTAGEM`
-
-**3. Casos críticos de renomeação a evitar:**
-- Se `EDS` virar `E.D.S.`, `EDS ` (com espaço) ou similar → o esforço de EDS será acrescido de **40% de sobrecarga** indevidamente
-- Se `VENT MAX` virar `VENTO MAX` ou similar → **o vento no fuste não será aplicado**, mesmo com o checkbox marcado
-- Se `QUEBRA PR1 A` (ou qualquer QUEBRA) for renomeado → a hipótese mais crítica do PR **não será calculada**
-
-**4. A ordem dos critérios no menu Criteria do PLS-CADD não afeta o cálculo**, só a ordem de exibição nos resultados. Comparar dois lotes exportados em ordens diferentes mostrará os mesmos valores, apenas em sequências diferentes.
-
-**5. Não misture trechos com configurações de circuito diferentes no mesmo lote** (ex.: estruturas `CD_com_PR` com Sets {1, 2, 4} e estruturas `CS_com_PR` com Sets {1, 4}). Processe em lotes separados. O cálculo em massa não valida a compatibilidade de sets por estrutura e pode **subestimar** os esforços de estruturas com sets incompletos.
-
-**6. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos postes laterais precisa ser informada **manualmente** na coluna **Altura lateral** — o PLS-CADD não tem essa informação.
-
-**7. Configuração dos Sets — todas as estruturas, sem exceção:**
-
-| Set | Destinação |
-|---|---|
-| **1** | Condutores do **circuito 1** |
-| **2** | Condutores do **circuito 2** (se houver) |
-| **4** | Cabo **para-raios 1** (se houver) |
-| **5** | Cabo **para-raios 2** (se houver) |
-
-Sets com numeração diferente ou atribuição trocada fazem o VHPT 2.0 **não reconhecer** os cabos corretamente — os esforços podem ser atribuídos à estrutura errada, com **subdimensionamento** ou **superdimensionamento** silencioso.
-""")
-
-    st.session_state["massa_confirmou_orientacoes"] = st.checkbox(
-        "Li e entendi as orientações de uso acima. Estou ciente de que o uso "
-        "incorreto da ferramenta pode gerar dimensionamento inadequado.",
-        value=st.session_state.get("massa_confirmou_orientacoes", False),
-        key="massa_chk_confirmacao",
-    )
-
-    st.markdown("---")
+    if not st.session_state.get("massa_confirmou_orientacoes", False):
+        st.warning(
+            "⚠️ **Confirmação de leitura das orientações de uso pendente.** "
+            "As orientações estão na **etapa 1** (primeira tela da aba massa). "
+            "Marque abaixo para liberar o cálculo, ou volte à etapa 1 para revisá-las."
+        )
+        st.session_state["massa_confirmou_orientacoes"] = st.checkbox(
+            "✅ Li e entendi as orientações de uso. Estou ciente dos riscos de uso incorreto.",
+            value=False,
+            key="massa_chk_confirmar_em_conferir",
+        )
+        st.markdown("---")
 
     st.caption(
         "Os valores vêm do cadastro e da tabela colada. "
@@ -1371,7 +1428,6 @@ Sets com numeração diferente ou atribuição trocada fazem o VHPT 2.0 **não r
         },
     )
 
-    # Reaplica a regra da Altura lateral (auto-cópia para 3p sem PR, N/A para 1p)
     df_editado = _aplicar_regra_altura_lateral(df_editado, estruturas_dict)
 
     estados, motivos = [], []
@@ -1393,7 +1449,6 @@ Sets com numeração diferente ou atribuição trocada fazem o VHPT 2.0 **não r
     n_calculaveis = sum(1 for e in estados if e == "✅ Calculada")
     st.info(f"Estruturas calculáveis: **{n_calculaveis}** de **{len(estados)}**")
 
-    # Aviso de pendências de altura lateral
     n_pendente_lateral = sum(1 for e in estados if e == "🔶 Altura lateral pendente")
     if n_pendente_lateral > 0:
         st.warning(
@@ -1404,7 +1459,7 @@ Sets com numeração diferente ou atribuição trocada fazem o VHPT 2.0 **não r
         )
 
     st.markdown("---")
-    st.subheader("☑️ 3. Hipóteses a processar (para todas as estruturas)")
+    st.subheader("☑️ 4. Hipóteses a processar (para todas as estruturas)")
 
     if st.session_state.get("massa_marcar_flag"):
         for lc in TODAS_LCS:
@@ -1435,7 +1490,7 @@ Sets com numeração diferente ou atribuição trocada fazem o VHPT 2.0 **não r
             st.session_state["massa_lcs_marcados"][lc] = marcado
 
     st.markdown("---")
-    st.subheader("⚙️ 4. Configurações globais")
+    st.subheader("⚙️ 5. Configurações globais")
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -1519,7 +1574,6 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
             "dist_pr": row["dist_pr"], "dist_pr2": None,
         }
 
-        # Altura lateral (só usada em 3 postes)
         altura_lateral = altura
         if num_postes == 3:
             al_raw = row.get("Altura lateral", "")
