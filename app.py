@@ -483,7 +483,7 @@ def calcular_3_postes(df_lc, lc_nome, estrutura, altura_central, altura_lateral,
 # ============================================================
 # VISUALIZAÇÃO
 # ============================================================
-def plotar_diagrama(resultado, estrutura):
+def plotar_diagrama(resultado, estrutura, rotulo_poste=""):
     fig, ax = plt.subplots(figsize=(8, 6))
     F_T, F_L = resultado["F_T"], resultado["F_L"]
     R, theta_R = resultado["R"], resultado["theta_R"]
@@ -525,7 +525,12 @@ def plotar_diagrama(resultado, estrutura):
     ax.set_aspect('equal'); ax.grid(True, alpha=0.2)
     ax.set_xlabel('Longitudinal (X)', fontsize=10)
     ax.set_ylabel('Transversal (Y)', fontsize=10)
-    ax.set_title(f'{resultado["LC"]} — R_final = {resultado["R_final"]:.1f} daN',
+
+    titulo = resultado["LC"]
+    if rotulo_poste:
+        titulo = f"{rotulo_poste} — {titulo}"
+
+    ax.set_title(f'{titulo} — R_final = {resultado["R_final"]:.1f} daN',
                  fontsize=11, fontweight='bold')
     ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=8)
     plt.tight_layout()
@@ -1018,58 +1023,126 @@ def render_individual_tab(estruturas_liberadas):
         elif num_postes == 3:
             tem_pr = estrutura["tem_pr"]
 
-            # Tabela consolidada por LC
-            linhas = []
-            for r in resultados:
-                linha = {
-                    "LC": r["LC"],
-                    "Poste lateral": r["poste_lateral"],
-                }
-                if tem_pr:
-                    linha["Poste central"] = r["poste_central"]
-                    linha["Consolidado"] = r["poste_str"]
-                else:
-                    linha["Poste central"] = r["poste_central"]
-                    linha["Consolidado"] = r["poste_str"]
-                linha["R_final máx (daN)"] = f"{r['R_final_max']:.1f}"
-                linhas.append(linha)
-            st.dataframe(pd.DataFrame(linhas), use_container_width=True, hide_index=True)
+            # ---------- helper: monta 1 linha no formato do caso de 1 poste ----------
+            def _linha_resultado(res, rotulo_poste=None):
+                d = {}
+                if rotulo_poste is not None:
+                    d["Poste"] = rotulo_poste
+                d.update({
+                    "LC": res["LC"],
+                    "V_total": f"{res['V_total']:.1f}",
+                    "T_back": f"{res['T_back']:.1f}", "T_ahead": f"{res['T_ahead']:.1f}",
+                    "L_back": f"{res['L_back']:.1f}", "L_ahead": f"{res['L_ahead']:.1f}",
+                    "F_T (transf.)": f"{res['F_T']:.1f}", "F_L (transf.)": f"{res['F_L']:.1f}",
+                    "R (daN)": f"{res['R']:.1f}", "θ_R (°)": f"{res['theta_R']:.1f}",
+                    "θ_face (°)": f"{res['theta_face']:.1f}" if res['theta_face'] is not None else "—",
+                    "Fator DT": f"{res['fator_DT']:.3f}",
+                    "R_corr (daN)": f"{res['R_corr']:.1f}",
+                    "Divisor": f"{res['divisor']:.2f}",
+                    "R_final (daN)": f"{res['R_final']:.1f}",
+                    "Poste": res["poste"],
+                })
+                return d
 
-            # Consolidação final
-            if tem_pr:
-                poste_lateral_final = max(r["poste_lateral"] for r in resultados)
-                poste_central_final = max(r["poste_central"] for r in resultados)
-                poste_str_final = f"2× {poste_lateral_final} + 1× {poste_central_final}"
+            # ==================================================
+            # TABELA 1 — POSTE CENTRAL (P2)
+            # ==================================================
+            st.markdown(
+                "#### 🟦 Poste central (P2) — Fase B"
+                + (" + PR" if tem_pr else "")
+            )
+            linhas_central = [
+                _linha_resultado(r["res_p2"])
+                for r in resultados if r["res_p2"] is not None
+            ]
+            if linhas_central:
+                st.dataframe(
+                    pd.DataFrame(linhas_central),
+                    use_container_width=True, hide_index=True,
+                )
             else:
-                poste_final = max(r["poste_max"] for r in resultados)
-                poste_str_final = f"3× {poste_final}"
+                st.info("Sem resultados para o poste central.")
+
+            # ==================================================
+            # TABELA 2 — POSTES LATERAIS (P1 e P3)
+            # ==================================================
+            st.markdown("#### 🟨 Postes laterais (P1 — Fase A · P3 — Fase C)")
+            linhas_lat = []
+            for r in resultados:
+                if r["res_p1"] is not None:
+                    linhas_lat.append(_linha_resultado(r["res_p1"], "P1 (lateral esq.)"))
+                if r["res_p3"] is not None:
+                    linhas_lat.append(_linha_resultado(r["res_p3"], "P3 (lateral dir.)"))
+
+            if linhas_lat:
+                st.dataframe(
+                    pd.DataFrame(linhas_lat),
+                    use_container_width=True, hide_index=True,
+                )
+            else:
+                st.info("Sem resultados para os postes laterais.")
+
+            # ==================================================
+            # RESUMO
+            # ==================================================
+            st.markdown("### 🎯 Resumo")
+            if tem_pr:
+                poste_lat_fin = max(r["poste_lateral"] for r in resultados)
+                poste_cen_fin = max(r["poste_central"] for r in resultados)
+                poste_str_fin = (
+                    f"2× {poste_lat_fin} daN (laterais) + "
+                    f"1× {poste_cen_fin} daN (central)"
+                )
+            else:
+                poste_fin = max(r["poste_max"] for r in resultados)
+                poste_str_fin = f"3× {poste_fin} daN"
 
             crit = next(r for r in resultados if r["LC"] == st.session_state["lc_critico"])
-            st.markdown("### 🎯 Resumo")
+
             cA, cB, cC = st.columns(3)
-            with cA: st.metric("Poste recomendado", poste_str_final)
-            with cB: st.metric("LC crítico", crit["LC"])
-            with cC: st.metric("R_final do crítico", f"{crit['R_final_max']:.1f} daN")
+            with cA:
+                st.metric("Poste recomendado", poste_str_fin)
+            with cB:
+                st.metric("LC mais severo (conjunto)", crit["LC"])
+            with cC:
+                st.metric("R_final máx (conjunto)", f"{crit['R_final_max']:.1f} daN")
 
             if any(r["estourou"] for r in resultados):
                 st.warning("⚠️ Pelo menos um LC ultrapassou 4000 daN.")
 
-            # Diagramas por poste (do LC crítico)
-            st.markdown("### 📈 Diagramas vetoriais (LC crítico)")
-            crit_res = next(r for r in resultados if r["LC"] == st.session_state["lc_critico"])
+            # ==================================================
+            # DIAGRAMAS — mesmo padrão do caso de 1 poste
+            # ==================================================
+            st.markdown("### 📈 Diagrama vetorial")
+            opcoes_lc = [r["LC"] for r in resultados]
+            if ("sel_lc_grafico_3p" not in st.session_state
+                    or st.session_state["sel_lc_grafico_3p"] not in opcoes_lc):
+                st.session_state["sel_lc_grafico_3p"] = opcoes_lc[0] if opcoes_lc else ""
 
-            abas = []
-            if crit_res["res_p1"]: abas.append(("P1 (lateral esq.)", crit_res["res_p1"]))
-            if crit_res["res_p2"]: abas.append(("P2 (central)", crit_res["res_p2"]))
-            if crit_res["res_p3"]: abas.append(("P3 (lateral dir.)", crit_res["res_p3"]))
+            lc_graf = st.selectbox(
+                "LC para visualizar:", opcoes_lc, key="sel_lc_grafico_3p"
+            )
+            res_lc = next((r for r in resultados if r["LC"] == lc_graf), None)
 
-            if abas:
-                tab_objs = st.tabs([a[0] for a in abas])
-                for i, (label, res) in enumerate(abas):
-                    with tab_objs[i]:
-                        fig = plotar_diagrama(res, estrutura)
-                        st.pyplot(fig)
-                        plt.close(fig)
+            if res_lc is not None:
+                abas_def = []
+                if res_lc["res_p1"] is not None:
+                    abas_def.append(("Poste lateral esquerdo (P1)", res_lc["res_p1"]))
+                if res_lc["res_p2"] is not None:
+                    abas_def.append(("Poste central (P2)", res_lc["res_p2"]))
+                if res_lc["res_p3"] is not None:
+                    abas_def.append(("Poste lateral direito (P3)", res_lc["res_p3"]))
+
+                if abas_def:
+                    tab_objs = st.tabs([label for label, _ in abas_def])
+                    for i, (label, res) in enumerate(abas_def):
+                        with tab_objs[i]:
+                            rotulo = label.split(" (")[0]
+                            fig = plotar_diagrama(res, estrutura, rotulo_poste=rotulo)
+                            st.pyplot(fig)
+                            plt.close(fig)
+                else:
+                    st.info("Nenhum poste tem esforço calculado para esse LC.")
 
 # ============================================================
 # TAB: MASSA (INTACTA — só 1 poste)
