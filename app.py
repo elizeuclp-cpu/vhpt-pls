@@ -1236,7 +1236,7 @@ MONTAGEM
 ~~~
 
 **3. Cadastre as hipóteses no PLS-CADD conforme o arquivo padrão.**
-O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão no iteM 2.
+O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão no item 2.
 """)
 
         if os.path.exists(CAMINHO_STRUCTURE_LOADS):
