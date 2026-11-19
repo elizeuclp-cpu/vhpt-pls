@@ -1639,7 +1639,6 @@ def _executar_calculo_massa(df_conf, estruturas_dict):
             "Estado": "✅ Calculada",
             "Poste central": crit["poste_cen"],
             "Poste lateral": crit["poste_lat"],
-            "Poste central": crit["poste_cen"],
             "Poste consolidado": crit["poste_cons"],
             "LC crítico": crit["res"]["LC"],
             "R_final (daN)": f"{crit['R_final_crit']:.1f}",
