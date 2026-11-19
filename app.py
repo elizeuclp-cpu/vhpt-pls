@@ -1236,7 +1236,7 @@ MONTAGEM
 ~~~
 
 **3. Cadastre as hipóteses no PLS-CADD conforme o arquivo padrão.**
-O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão nos itens 2 e 3.
+O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão no iteM 2.
 """)
 
         if os.path.exists(CAMINHO_STRUCTURE_LOADS):
@@ -1296,6 +1296,9 @@ Nome divergente → **❌ Não homologada**. Altura fora da lista (`18, 20, 22, 
 | **5** | Cabo **para-raios 2** (se houver) |
 
 Sets trocados ou fora dessa numeração fazem o VHPT 2.0 atribuir esforços à estrutura errada — **sub ou superdimensionamento silencioso**.
+
+
+**ATENÇÃO:** Esta ferramenta encontra-se em fase de testes. Em caso de bugs, falhas de funcionamento ou sugestões de melhoria, entre em contato com o desenvolvedor. 
 """)
 
     st.session_state["massa_confirmou_orientacoes"] = st.checkbox(
