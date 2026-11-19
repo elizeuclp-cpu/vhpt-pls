@@ -1202,7 +1202,7 @@ def render_massa_tab(estruturas_dict):
         _massa_etapa_resultado()
 
 def _massa_etapa_colar():
-    st.subheader("📋 1. Orientações de uso e colagem da tabela")
+    st.subheader("📋 1. Orientações de uso da Ferramenta de Dimensionamento em Massa - VHPT 2.0")
 
     with st.expander("📖 Leia atentamente as orientações de uso antes de prosseguir", expanded=True):
         st.markdown("""
