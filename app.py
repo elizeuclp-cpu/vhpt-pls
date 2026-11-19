@@ -1235,12 +1235,7 @@ QUEBRA PR2 A
 MONTAGEM
 ~~~
 
-**3. Casos críticos de renomeação:**
-- `EDS` renomeado → esforço de EDS recebe **40% de sobrecarga** indevidamente
-- `VENT MAX` renomeado → **vento no fuste não é aplicado**
-- Qualquer `QUEBRA` renomeado → hipótese **não é calculada**
-
-**4. Cadastre as hipóteses no PLS-CADD conforme o arquivo padrão.**
+**3. Cadastre as hipóteses no PLS-CADD conforme o arquivo padrão.**
 O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VHPT 2.0 e é o **padrão obrigatório** de cadastro. Importe-o no PLS-CADD pelo menu **`Criteria` → `Structure Loads (Methods 3,4)`**. Não altere nomes nem crie hipóteses fora desse arquivo — as consequências estão nos itens 2 e 3.
 """)
 
@@ -1260,7 +1255,7 @@ O arquivo **`Structure Loads.xlsx`** está disponível no mesmo diretório do VH
             )
 
         st.markdown("""
-**5. Formato do `Str. Name`.**
+**4. Formato do `Str. Name`.**
 Formato obrigatório: **`NomeEstrutura.AlturaEmDecímetros`**
 - `NomeEstrutura` = nome **exato** cadastrado em `estruturas.xlsx`
 - `AlturaEmDecímetros` = **3 dígitos**, altura × 10 (ex.: `220` = 22,0 m)
@@ -1286,13 +1281,12 @@ Nome divergente → **❌ Não homologada**. Altura fora da lista (`18, 20, 22, 
             )
 
         st.markdown("""
-**6. A ordem dos critérios no menu Criteria não afeta o cálculo**, só a ordem de exibição nos resultados.
 
-**7. Não misture trechos com configurações de circuito diferentes no mesmo lote** (`CD_com_PR` com Sets {1, 2, 4} + `CS_com_PR` com Sets {1, 4}). Processe em lotes separados — o cálculo em massa não valida compatibilidade de sets e pode **subestimar** os esforços.
+**5. Não misture trechos com configurações de circuito diferentes no mesmo lote** (`CD_com_PR` com Sets {1, 2, 4} + `CS_com_PR` com Sets {1, 4}). Processe em lotes separados — o cálculo em massa não valida compatibilidade de sets e pode **subestimar** os esforços.
 
-**8. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos laterais precisa ser informada manualmente na coluna **Altura lateral**.
+**6. PLS-CADD exporta apenas a altura do poste central.** Para estruturas de **3 postes com PR**, a altura dos laterais precisa ser informada manualmente na coluna **Altura lateral**.
 
-**9. Configuração dos Sets — todas as estruturas, sem exceção:**
+**7. Configuração dos Sets — todas as estruturas, sem exceção:**
 
 | Set | Destinação |
 |---|---|
